@@ -1,0 +1,59 @@
+yaml
+name: Sync Uploads to Main
+
+# This runs whenever someone pushes to the "uploads" branch
+on:
+  push:
+    branches:
+      - uploads
+
+jobs:
+  sync-new-files:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      # Step 1: Get the main branch code
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      
+      # Step 2: Get info about uploads branch
+      - name: Fetch uploads branch
+        run: git fetch origin uploads
+      
+      # Step 3: Find NEW files and copy them
+      - name: Copy only NEW MIDI files from uploads
+        run: |
+          echo "🔍 Looking for new MIDI files..."
+          
+          # Find files that exist in uploads but NOT in main
+          git diff --name-only --diff-filter=A origin/main origin/uploads | while read file; do
+            # Only copy .mid and .midi files
+            if [[ "$file" == *.mid || "$file" == *.midi ]]; then
+              echo "✅ Found new file: $file"
+              git checkout origin/uploads -- "$file"
+            fi
+          done
+          
+          echo "🔍 Done scanning!"
+      
+      # Step 4: Save the new files to main
+      - name: Commit and push to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          
+          # Check if there are any changes to commit
+          if git diff --staged --quiet; then
+            echo "📭 No new files to add"
+          else
+            echo "📬 Committing new files..."
+            git commit -m "🎵 Add new MIDI files from community uploads"
+            git push origin main
+            echo "✅ Done! New files are now on main branch"
+          fi
