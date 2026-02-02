@@ -1,59 +1,31 @@
-yaml
-name: Sync Uploads to Main
-
-# This runs whenever someone pushes to the "uploads" branch
+name: Update Jade Library
 on:
   push:
     branches:
-      - uploads
-
+      - main
+      - uploads  # If you want it to run on uploads branch too
+  pull_request:
+    types: [closed]
+    branches:
+      - main
 jobs:
-  sync-new-files:
+  build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    
     steps:
-      # Step 1: Get the main branch code
-      - name: Checkout main branch
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          ref: main
-          fetch-depth: 0
+          python-version: '3.x'
       
-      # Step 2: Get info about uploads branch
-      - name: Fetch uploads branch
-        run: git fetch origin uploads
+      - name: Update library index
+        run: python update_library.py
       
-      # Step 3: Find NEW files and copy them
-      - name: Copy only NEW MIDI files from uploads
+      - name: Commit changes
         run: |
-          echo "🔍 Looking for new MIDI files..."
-          
-          # Find files that exist in uploads but NOT in main
-          git diff --name-only --diff-filter=A origin/main origin/uploads | while read file; do
-            # Only copy .mid and .midi files
-            if [[ "$file" == *.mid || "$file" == *.midi ]]; then
-              echo "✅ Found new file: $file"
-              git checkout origin/uploads -- "$file"
-            fi
-          done
-          
-          echo "🔍 Done scanning!"
-      
-      # Step 4: Save the new files to main
-      - name: Commit and push to main
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          
-          # Check if there are any changes to commit
-          if git diff --staged --quiet; then
-            echo "📭 No new files to add"
-          else
-            echo "📬 Committing new files..."
-            git commit -m "🎵 Add new MIDI files from community uploads"
-            git push origin main
-            echo "✅ Done! New files are now on main branch"
-          fi
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add library.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update library index"
+          git push
