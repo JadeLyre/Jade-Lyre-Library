@@ -1,41 +1,35 @@
-#!/usr/bin/env python3
-"""
-Jade Lyre Library Index Generator
-Automatically generates library.json from MIDI files in midis/ folder.
-Called by GitHub Actions on push.
-"""
-import json
-import os
-from pathlib import Path
-from datetime import datetime
-def main():
-    midi_path = Path("midis")
-    
-    if not midi_path.exists():
-        print("No midis/ folder found, creating empty library.json")
-        Path("library.json").write_text("[]")
-        return
-    
-    # Find all MIDI files
-    midi_files = list(midi_path.glob("*.mid")) + list(midi_path.glob("*.midi"))
-    
-    # Build library index
-    library = []
-    for f in sorted(midi_files):
-        library.append({
-            "name": f.stem,
-            "filename": f.name,
-            "path": str(f),
-            "size": f.stat().st_size,
-            "added": datetime.fromtimestamp(f.stat().st_mtime).isoformat()
-        })
-    
-    # Write library.json
-    Path("library.json").write_text(json.dumps(library, indent=2))
-    print(f"✓ Updated library.json with {len(library)} songs")
-    
-    # Print summary
-    for song in library:
-        print(f"  - {song['name']}")
-if __name__ == "__main__":
-    main()
+name: Update Jade Library
+on:
+  push:
+    branches:
+      - uploads  
+      - main     
+permissions:
+  contents: write
+jobs:
+  organize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Get all history
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: 🧠 Run The Brain
+        run: python update_library.py
+      - name: 💾 Save Changes
+        run: |
+          git config --local user.email "auto@jadelyre.com"
+          git config --local user.name "Jade Library Automation"
+          
+          # Add the new index
+          git add library.json
+          
+          # Commit (only if changed)
+          git diff --quiet && git diff --staged --quiet || git commit -m "Auto-index library [skip ci]"
+          
+          # Push to Main (The Vault)
+          git push origin HEAD:main
