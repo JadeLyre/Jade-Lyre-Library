@@ -1,41 +1,29 @@
 #!/usr/bin/env python3
-"""
-Jade Lyre Library Index Generator
-Automatically generates library.json from MIDI files in midis/ folder.
-Called by GitHub Actions on push.
-"""
 import json
 import os
 from pathlib import Path
 from datetime import datetime
 def main():
-    midi_path = Path("midis")
+    midi_folder = Path("midis")
+    output_file = Path("library.json")
     
-    if not midi_path.exists():
-        print("No midis/ folder found, creating empty library.json")
-        Path("library.json").write_text("[]")
-        return
+    if not midi_folder.exists():
+        midi_folder.mkdir(exist_ok=True)
     
-    # Find all MIDI files
-    midi_files = list(midi_path.glob("*.mid")) + list(midi_path.glob("*.midi"))
+    files = list(midi_folder.glob("*.mid")) + list(midi_folder.glob("*.midi"))
     
-    # Build library index
     library = []
-    for f in sorted(midi_files):
+    for f in sorted(files):
+        stats = f.stat()
         library.append({
-            "name": f.stem,
+            "name": f.stem.replace("_", " ").title(),
             "filename": f.name,
-            "path": str(f),
-            "size": f.stat().st_size,
-            "added": datetime.fromtimestamp(f.stat().st_mtime).isoformat()
+            "path": f"midis/{f.name}",
+            "size": stats.st_size,
+            "added": datetime.fromtimestamp(stats.st_mtime).isoformat()
         })
     
-    # Write library.json
-    Path("library.json").write_text(json.dumps(library, indent=2))
-    print(f"✓ Updated library.json with {len(library)} songs")
-    
-    # Print summary
-    for song in library:
-        print(f"  - {song['name']}")
+    output_file.write_text(json.dumps(library, indent=2))
+    print(f"Indexed {len(library)} songs.")
 if __name__ == "__main__":
     main()
